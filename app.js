@@ -1,7 +1,7 @@
 // ===== LÓGICA (edita aquí: Choisaint) =====
 const MARS_R = 3389.5;          // radio de Marte en km
 const EARTH_R = 6371;           // Leaflet asume la Tierra en sus cálculos
-const RADAR_PX = 90;            // radio del radar en píxeles (mitad de 180)
+const RADAR_PX = 90;            // radio del radar en píxeles (mitad de 180) maldito seas github
 
 // --- Distancia y rumbo en Marte (no usar map.distance: asume la Tierra) ---
 const rad = d => d * Math.PI / 180;
