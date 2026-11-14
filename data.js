@@ -26,3 +26,14 @@ const POIS = [
   { name: "Cresta rocosa (ejemplo)",       lat: 17.90, lng: 77.20, type: "peligro", desc: "Pendiente fuerte" },
   { name: "Punto de reabastecimiento (ejemplo)", lat: 18.55, lng: 78.10, type: "base", desc: "Refugio y recarga" }
 ];
+
+// Capa de altitud: DEM en escala de grises de MOLA (Trek). VERIFICAR el nombre en
+// https://trek.nasa.gov/tiles/apidoc/trekAPI.html?body=mars (busca "DEM Grayscale - Mars Orbiter Laser Altimeter")
+// min y max: altitud (m) que representan el negro y el blanco. Son valores aproximados:
+// CALIBRAR con dos puntos conocidos (p. ej. cumbre del Olympus Mons ~21 200 m, fondo de Hellas ~ -8 200 m).
+const DEM = {
+  url: "https://trek.nasa.gov/tiles/Mars/EQ/Mars_MGS_MOLA_DEM_mosaic_global_463m/1.0.0/default/default028mm/{z}/{y}/{x}.png",
+  maxNativeZoom: 5,
+  min: -8200,
+  max: 21200
+};
