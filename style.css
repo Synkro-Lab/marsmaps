@@ -1,0 +1,44 @@
+:root {
+  --space: #0b0d12;
+  --hud: #5ee7d6;       /* cian del radar */
+  --hud-dim: rgba(94, 231, 214, 0.25);
+  --rust: #e0894f;      /* puntos de interés */
+  --text: #dfe9ee;
+}
+html, body { height: 100%; margin: 0; background: var(--space); color: var(--text);
+  font-family: system-ui, sans-serif; }
+#map { height: 100%; background: var(--space); }
+
+/* Radar */
+#radar-box { position: absolute; left: 16px; bottom: 16px; z-index: 1000;
+  background: rgba(11, 13, 18, 0.85); border: 1px solid var(--hud-dim);
+  border-radius: 10px; padding: 12px; width: 190px; text-align: center; font-size: 13px; }
+#radar { position: relative; width: 180px; height: 180px; margin: 0 auto 8px;
+  border-radius: 50%; border: 2px solid var(--hud); overflow: hidden;
+  background:
+    radial-gradient(circle, transparent 32%, var(--hud-dim) 33%, transparent 34%),
+    radial-gradient(circle, transparent 65%, var(--hud-dim) 66%, transparent 67%),
+    linear-gradient(var(--hud-dim), var(--hud-dim)) center / 1px 100% no-repeat,
+    linear-gradient(var(--hud-dim), var(--hud-dim)) center / 100% 1px no-repeat,
+    rgba(94, 231, 214, 0.06); }
+#radar-sweep { position: absolute; inset: 0; border-radius: 50%;
+  background: conic-gradient(from 0deg, rgba(94, 231, 214, 0.45), transparent 60deg);
+  animation: sweep 3s linear infinite; }
+@keyframes sweep { to { transform: rotate(360deg); } }
+.blip { position: absolute; width: 8px; height: 8px; margin: -4px 0 0 -4px;
+  border-radius: 50%; background: var(--rust); box-shadow: 0 0 6px var(--rust); }
+#radar::after { content: ""; position: absolute; left: 50%; top: 50%; width: 6px; height: 6px;
+  margin: -3px; border-radius: 50%; background: var(--hud); }
+#range { width: 100%; }
+@media (prefers-reduced-motion: reduce) { #radar-sweep { animation: none; } }
+
+/* Panel */
+#panel { position: absolute; right: 16px; top: 16px; z-index: 1000; width: 230px;
+  background: rgba(11, 13, 18, 0.85); border: 1px solid var(--hud-dim);
+  border-radius: 10px; padding: 12px; font-size: 13px; }
+#panel button { background: transparent; color: var(--hud); border: 1px solid var(--hud);
+  border-radius: 6px; padding: 5px 9px; cursor: pointer; }
+#panel button.active { background: var(--hud); color: var(--space); }
+#panel h3 { margin: 12px 0 4px; font-size: 14px; }
+#nearby { list-style: none; margin: 0; padding: 0; }
+#nearby li { padding: 2px 0; }
