@@ -34,7 +34,7 @@ BASE_LAYERS.forEach((b, i) => {
 });
 
 // --- Puntos de interés ---
-const poiGroup = L.layerGroup().addTo(map);   // puntos manuales (data.js)
+const poiGroup = L.layerGroup();   // empieza apagado; contiene los manuales y todos los grupos por tipo
 const tipoGroups = {};                        // un grupo por tipo de la base de datos
 
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -106,7 +106,7 @@ async function cargarNomenclatura() {
       tipo: f.tipo, etnia: f.etnia, origen: f.origen
     };
     POIS.push(p);                                                    // el radar también los ve
-    if (!tipoGroups[cat]) tipoGroups[cat] = L.layerGroup().addTo(map);
+       if (!tipoGroups[cat]) { tipoGroups[cat] = L.layerGroup(); poiGroup.addLayer(tipoGroups[cat]); }
     addPoi(p, tipoGroups[cat]);
     conteo[cat] = (conteo[cat] || 0) + 1;
   }
