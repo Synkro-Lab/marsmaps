@@ -1,4 +1,4 @@
-// ===== DATOS (edita aquí: Diego) =====
+// ===== DATOS (edita aquí) =====
 
 // Capas base de NASA Trek. VERIFICAR cada URL en trek.nasa.gov/mars
 // Para agregar otra capa (térmica, mineralogía...), copia un bloque y cambia nombre y URL.
