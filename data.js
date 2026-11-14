@@ -34,13 +34,12 @@ const POIS = [
 ];
 
 // Capa de altitud: se estima por el TONO de la capa MOLA a color (no hay DEM puro en Trek).
-// La conversión tono -> metros sale de CAL_TABLE (más abajo).
+// La conversión color -> metros sale de calibracion.js (generarCalibracion() en la consola, usa la base de
+// nomenclatura). CAL_TABLE queda solo como respaldo si calibracion.js no existe.
 const DEM = {
   url: "https://trek.nasa.gov/tiles/Mars/EQ/Mars_MGS_MOLA_ClrShade_merge_global_463m/1.0.0/default/default028mm/{z}/{y}/{x}.jpg",
   maxNativeZoom: 5,
 };
-// [tono, metros] medidos con Show Pixel Value. Orden: tono de menor a mayor.
-// OJO: estos valores son de EJEMPLO, hay que reemplazarlos con mediciones reales.
+// Respaldo: [tono, metros] medidos con Show Pixel Value. Orden: tono de menor a mayor.
 const CAL_TABLE = [[7, 4538], [28, 2038], [120, -1500], [200, -5000], [270, -8200]];
 const SAT_MIN = 0.12;       // por debajo de esta saturación el píxel es blanco/gris: no hay tono
-const HIGH_WHITE = 21000;   // metros que asignamos al blanco: MEDIR en un píxel blanco con Show Pixel Value

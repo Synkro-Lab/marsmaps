@@ -21,19 +21,30 @@
     <input type="range" id="range" min="10" max="500" step="10" value="100">
   </div>
 
-  <!-- Panel de ruta y cercanos -->
+  <!-- Panel de ruta y cercanos (colapsable) -->
   <div id="panel">
-    <button id="btn-route">Trazar ruta</button>
-    <button id="btn-clear">Borrar ruta</button>
-    <button id="btn-start">Inicio = astronauta</button>
-    <p id="route-info">Ruta: sin puntos</p>
-    <p id="route-elev"></p>
-    <h3>Cerca de ti</h3>
-    <ul id="nearby"></ul>
+    <div id="panel-head">
+      <strong>Ruta</strong>
+      <button id="btn-collapse" title="Colapsar panel">–</button>
+    </div>
+    <div id="panel-body">
+      <button id="btn-route">Trazar ruta</button>
+      <button id="btn-clear">Borrar ruta</button>
+      <button id="btn-start">Inicio = astronauta</button>
+      <p id="route-info">Ruta: sin puntos</p>
+      <p id="route-elev"></p>
+      <h3>Cerca de ti</h3>
+      <ul id="nearby"></ul>
+    </div>
   </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="data.js"></script>
+  <script src="nomenclatura.js"></script>
+  <!-- calibracion.js se genera una vez con generarCalibracion() en la consola; si no existe, se usa la tabla de respaldo -->
+  <script src="calibracion.js" onerror="console.warn('calibracion.js todavía no existe: se usa la tabla de respaldo')"></script>
   <script src="app.js"></script>
+
+
 </body>
 </html>
