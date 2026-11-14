@@ -135,6 +135,7 @@ function heightFromHue(h) {
 }
 
 let lastHue = null;   // último tono leído (para calibrar)
+let lastSat = 0;
 let frozen = false;   // true = la caja de altitud se queda quieta
 
 async function elevationAt(ll) {
@@ -143,6 +144,9 @@ async function elevationAt(ll) {
   const tx = Math.floor(p.x / 256), ty = Math.floor(p.y / 256);
   const ctx = await loadDemTile(z, tx, ty);
     const [r, g, b] = ctx.getImageData(Math.floor(p.x - tx * 256), Math.floor(p.y - ty * 256), 1, 1).data;
+      const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+  lastSat = mx === 0 ? 0 : (mx - mn) / mx;
+  if (lastSat < SAT_MIN) { lastHue = null; return HIGH_WHITE; }   // blanco/gris: zona más alta
   let h = hueOf(r, g, b);
   if (h === null) throw new Error('pixel sin color');
   if (h > 320) h -= 360;   // rojos que cruzan el 0: sin esto se leerían como la zona más baja
@@ -160,7 +164,7 @@ map.on('mousemove', e => {
     try {
       const h = await elevationAt(e.latlng);
       if (frozen) return;
-      elevBox.textContent = `Lat ${e.latlng.lat.toFixed(3)}, Lon ${e.latlng.lng.toFixed(3)} · tono ${Math.round(lastHue)} · Altitud ${Math.round(h)} m (aprox.)`;
+      elevBox.textContent = `Lat ${e.latlng.lat.toFixed(3)}, Lon ${e.latlng.lng.toFixed(3)} · tono ${lastHue === null ? 'blanco' : Math.round(lastHue)} · sat ${Math.round(lastSat * 100)}% · Altitud ${Math.round(h)} m (aprox.)`;
     } catch (err) {
       elevBox.textContent = 'Altitud no disponible: ' + err.message;
     }
