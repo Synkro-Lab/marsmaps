@@ -309,7 +309,7 @@ map.on('mousemove', e => {
     try {
       const h = await elevationAt(e.latlng);
       if (frozen) return;
-      elevBox.textContent = `Lat ${e.latlng.lat.toFixed(3)}, Lon ${e.latlng.lng.toFixed(3)} · tono ${lastHue === null ? 'blanco' : Math.round(lastHue)} · sat ${Math.round(lastSat * 100)}% · Altitud ${Math.round(h)} m${lastSpread !== null ? ' ±' + Math.round(lastSpread) : ''} (aprox.)`;
+      elevBox.textContent = `Lat ${e.latlng.lat.toFixed(3)}, Lon ${e.latlng.lng.toFixed(3)} · Altitud ${Math.round(h)} m${lastSpread !== null ? ' ±' + Math.round(lastSpread) : ''} (aprox.)`;
     } catch (err) {
             elevBox.textContent = `Lat ${e.latlng.lat.toFixed(3)}, Lon ${e.latlng.lng.toFixed(3)} · sat ${Math.round(lastSat * 100)}% · ${err.message}`;
     }
