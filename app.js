@@ -122,6 +122,7 @@ const rangeCircle = L.circle(START, { radius: 0, color: "#5ee7d6", weight: 1, fi
 
 const layersControl = L.control.layers(baseLayers, { "Puntos de interés": poiGroup }).addTo(map);
 
+
 // --- Capas superpuestas con deslizador de opacidad (topografía, térmica...) ---
 const overlayBox = document.createElement('div');
 overlayBox.id = 'overlay-box';
