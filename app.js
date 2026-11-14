@@ -143,10 +143,16 @@ async function elevationAt(ll) {
   const p = map.project(ll, z);                       // píxel global en ese zoom
   const tx = Math.floor(p.x / 256), ty = Math.floor(p.y / 256);
   const ctx = await loadDemTile(z, tx, ty);
-    const [r, g, b] = ctx.getImageData(Math.floor(p.x - tx * 256), Math.floor(p.y - ty * 256), 1, 1).data;
+     const N = 5, half = 2;
+  const px = Math.max(0, Math.min(256 - N, Math.floor(p.x - tx * 256) - half));
+  const py = Math.max(0, Math.min(256 - N, Math.floor(p.y - ty * 256) - half));
+  const d = ctx.getImageData(px, py, N, N).data;
+  let r = 0, g = 0, b = 0;
+  for (let i = 0; i < d.length; i += 4) { r += d[i]; g += d[i + 1]; b += d[i + 2]; }
+  r /= d.length / 4; g /= d.length / 4; b /= d.length / 4;
       const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
   lastSat = mx === 0 ? 0 : (mx - mn) / mx;
-  if (lastSat < SAT_MIN) { lastHue = null; return HIGH_WHITE; }   // blanco/gris: zona más alta
+   if (lastSat < SAT_MIN) { lastHue = null; throw new Error('blanco: sin dato (cumbre o ladera iluminada)'); }
   let h = hueOf(r, g, b);
   if (h === null) throw new Error('pixel sin color');
   if (h > 320) h -= 360;   // rojos que cruzan el 0: sin esto se leerían como la zona más baja
@@ -155,7 +161,7 @@ async function elevationAt(ll) {
     return heightFromHue(h);
 }
 
-const elevBox = document.getElementById('elev-box');
+      elevBox.textContent = `Lat ${e.latlng.lat.toFixed(3)}, Lon ${e.latlng.lng.toFixed(3)} · sat ${Math.round(lastSat * 100)}% · ${err.message}`;
 let hoverTimer;
 map.on('mousemove', e => {
   if (frozen) return;

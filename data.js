@@ -41,6 +41,6 @@ const DEM = {
 };
 // [tono, metros] medidos con Show Pixel Value. Orden: tono de menor a mayor.
 // OJO: estos valores son de EJEMPLO, hay que reemplazarlos con mediciones reales.
-const CAL_TABLE = [[7, 4538], [60, 3000], [120, -1500], [200, -5000], [270, -8200]];
+const CAL_TABLE = [[7, 4538], [28, 2038], [120, -1500], [200, -5000], [270, -8200]];
 const SAT_MIN = 0.12;       // por debajo de esta saturación el píxel es blanco/gris: no hay tono
 const HIGH_WHITE = 21000;   // metros que asignamos al blanco: MEDIR en un píxel blanco con Show Pixel Value
