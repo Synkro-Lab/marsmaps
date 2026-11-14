@@ -161,7 +161,7 @@ async function elevationAt(ll) {
     return heightFromHue(h);
 }
 
-      elevBox.textContent = `Lat ${e.latlng.lat.toFixed(3)}, Lon ${e.latlng.lng.toFixed(3)} · sat ${Math.round(lastSat * 100)}% · ${err.message}`;
+const elevBox = document.getElementById('elev-box');
 let hoverTimer;
 map.on('mousemove', e => {
   if (frozen) return;
@@ -172,7 +172,7 @@ map.on('mousemove', e => {
       if (frozen) return;
       elevBox.textContent = `Lat ${e.latlng.lat.toFixed(3)}, Lon ${e.latlng.lng.toFixed(3)} · tono ${lastHue === null ? 'blanco' : Math.round(lastHue)} · sat ${Math.round(lastSat * 100)}% · Altitud ${Math.round(h)} m (aprox.)`;
     } catch (err) {
-      elevBox.textContent = 'Altitud no disponible: ' + err.message;
+            elevBox.textContent = `Lat ${e.latlng.lat.toFixed(3)}, Lon ${e.latlng.lng.toFixed(3)} · sat ${Math.round(lastSat * 100)}% · ${err.message}`;
     }
   }, 80);
 });
