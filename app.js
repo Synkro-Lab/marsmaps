@@ -33,8 +33,19 @@ BASE_LAYERS.forEach((b, i) => {
 const poiGroup = L.layerGroup().addTo(map);
 POIS.forEach(p => {
   const color = p.type === "peligro" ? "#e0894f" : p.type === "base" ? "#5ee7d6" : "#f2d36b";
-  L.circleMarker([p.lat, p.lng], { radius: 7, color, fillOpacity: 0.8 })
-    .bindPopup(`<b>${p.name}</b><br>${p.desc}`).addTo(poiGroup);
+   L.circleMarker([p.lat, p.lng], { radius: 9, color, fillOpacity: 0.8, bubblingMouseEvents: false })
+    .on('click', () => {
+      if (routing) {                       // modo ruta: el punto entra a la ruta
+        const ll = L.latLng(p.lat, p.lng);
+        ll.elev = p.elev;                  // altura medida a mano (si el punto la tiene)
+        waypoints.push(ll);
+        updateRoute(); updateRouteStats();
+      } else {                             // modo normal: muestra la descripción
+        L.popup().setLatLng([p.lat, p.lng])
+          .setContent(`<b>${p.name}</b><br>${p.desc}` + (p.elev !== undefined ? `<br>Altitud medida: ${p.elev} m` : '')).openOn(map);
+      }
+    })
+    .addTo(poiGroup);
 });
 
 // --- Astronauta (arrástralo y el radar se actualiza) ---
@@ -102,28 +113,64 @@ function loadDemTile(z, x, y) {
   }
   return demCache[key];
 }
+
+function hueOf(r, g, b) {
+  const mx = Math.max(r, g, b), d = mx - Math.min(r, g, b);
+  if (d === 0) return null;
+  let h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  h *= 60;
+  return h < 0 ? h + 360 : h;
+}
+
+function heightFromHue(h) {
+  const T = CAL_TABLE;
+  if (h <= T[0][0]) return T[0][1];
+  for (let i = 1; i < T.length; i++) {
+    if (h <= T[i][0]) {
+      const [h0, e0] = T[i - 1], [h1, e1] = T[i];
+      return e0 + (h - h0) * (e1 - e0) / (h1 - h0);
+    }
+  }
+  return T[T.length - 1][1];
+}
+
+let lastHue = null;   // último tono leído (para calibrar)
+let frozen = false;   // true = la caja de altitud se queda quieta
+
 async function elevationAt(ll) {
   const z = DEM.maxNativeZoom;
   const p = map.project(ll, z);                       // píxel global en ese zoom
   const tx = Math.floor(p.x / 256), ty = Math.floor(p.y / 256);
   const ctx = await loadDemTile(z, tx, ty);
-  const gray = ctx.getImageData(Math.floor(p.x - tx * 256), Math.floor(p.y - ty * 256), 1, 1).data[0];
-  return DEM.min + (gray / 255) * (DEM.max - DEM.min); // 0 a 255 -> metros
+    const [r, g, b] = ctx.getImageData(Math.floor(p.x - tx * 256), Math.floor(p.y - ty * 256), 1, 1).data;
+  let h = hueOf(r, g, b);
+  if (h === null) throw new Error('pixel sin color');
+  if (h > 320) h -= 360;   // rojos que cruzan el 0: sin esto se leerían como la zona más baja
+  console.log('tono', h.toFixed(0));   // sirve para calibrar
+    lastHue = h;
+    return heightFromHue(h);
 }
 
 const elevBox = document.getElementById('elev-box');
 let hoverTimer;
 map.on('mousemove', e => {
+  if (frozen) return;
   clearTimeout(hoverTimer);
   hoverTimer = setTimeout(async () => {
     try {
       const h = await elevationAt(e.latlng);
-      elevBox.textContent = `Altitud: ${Math.round(h)} m (aprox.)`;
+      if (frozen) return;
+      elevBox.textContent = `Lat ${e.latlng.lat.toFixed(3)}, Lon ${e.latlng.lng.toFixed(3)} · tono ${Math.round(lastHue)} · Altitud ${Math.round(h)} m (aprox.)`;
     } catch (err) {
       elevBox.textContent = 'Altitud no disponible: ' + err.message;
-      console.error(err);
     }
   }, 80);
+});
+// Clic (fuera del modo ruta): fija o suelta la lectura para poder copiarla
+map.on('click', () => {
+  if (routing) return;
+  frozen = !frozen;
+  elevBox.style.outline = frozen ? '1px solid #5ee7d6' : 'none';
 });
 
 // --- Ruta (inicio movible + puntos) ---
@@ -152,28 +199,23 @@ async function updateRouteStats() {
   const token = ++statsToken;
   const pts = routePoints();
   if (pts.length < 2) { routeElev.textContent = ''; return; }
-  const samples = [];
-  for (let i = 1; i < pts.length; i++) {
-    const n = Math.max(2, Math.min(15, Math.ceil(distKm(pts[i - 1], pts[i]) / 2))); // una muestra cada ~2 km
-    for (let k = 0; k < n; k++) {
-      const t = k / n;
-      samples.push(L.latLng(pts[i-1].lat + (pts[i].lat - pts[i-1].lat) * t, pts[i-1].lng + (pts[i].lng - pts[i-1].lng) * t));
-    }
-  }
-  samples.push(pts[pts.length - 1]);
+  let approx = false;
   try {
-    const hs = await Promise.all(samples.map(elevationAt));
-    if (token !== statsToken) return;   // llegó una ruta más nueva
+    const hs = await Promise.all(pts.map(async q => {
+      if (q.elev !== undefined) return q.elev;   // altura medida a mano
+      approx = true;
+      return elevationAt(q);                     // estimación por color
+    }));
+    if (token !== statsToken) return;
     let up = 0, down = 0, maxSlope = 0;
     for (let i = 1; i < hs.length; i++) {
-      const dh = hs[i] - hs[i - 1], dm = distKm(samples[i - 1], samples[i]) * 1000;
+      const dh = hs[i] - hs[i - 1], dm = distKm(pts[i - 1], pts[i]) * 1000;
       if (dh > 0) up += dh; else down -= dh;
       if (dm > 0) maxSlope = Math.max(maxSlope, Math.abs(dh) / dm * 100);
     }
-    routeElev.textContent = `Sube ${Math.round(up)} m, baja ${Math.round(down)} m, pendiente máx. ~${maxSlope.toFixed(0)}% (resolución ~460 m)`;
-  } catch (err) {
-    routeElev.textContent = 'Altitud no disponible: ' + err.message;
+    routeElev.textContent = `${approx ? '≈ ' : ''}Sube ${Math.round(up)} m, baja ${Math.round(down)} m, pendiente máx. ~${maxSlope.toFixed(0)}%`;
   }
+  catch (err) { routeElev.textContent = 'Altitud no disponible: ' + err.message; }
 }
 
 btnRoute.addEventListener('click', () => {
