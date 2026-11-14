@@ -57,3 +57,10 @@ html, body { height: 100%; margin: 0; background: var(--space); color: var(--tex
 #panel-head button { padding: 1px 8px; line-height: 1.2; }
 #panel.collapsed { width: auto; }
 #panel.collapsed #panel-body { display: none; }
+
+#overlay-box { position: absolute; left: 16px; top: 110px; z-index: 1000; width: 200px;
+  background: rgba(11, 13, 18, 0.85); border: 1px solid var(--hud-dim);
+  border-radius: 10px; padding: 10px 12px; font-size: 13px; }
+#overlay-box h3 { margin: 0 0 6px; font-size: 14px; }
+#overlay-box label { display: block; margin-top: 8px; }
+#overlay-box input { width: 100%; }

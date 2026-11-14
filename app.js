@@ -122,6 +122,36 @@ const rangeCircle = L.circle(START, { radius: 0, color: "#5ee7d6", weight: 1, fi
 
 const layersControl = L.control.layers(baseLayers, { "Puntos de interés": poiGroup }).addTo(map);
 
+// --- Capas superpuestas con deslizador de opacidad (topografía, térmica...) ---
+const overlayBox = document.createElement('div');
+overlayBox.id = 'overlay-box';
+overlayBox.innerHTML = '<h3>Capas superpuestas</h3>';
+document.body.appendChild(overlayBox);
+L.DomEvent.disableClickPropagation(overlayBox);    // que usar los sliders no mueva el mapa
+L.DomEvent.disableScrollPropagation(overlayBox);
+
+OVERLAYS.forEach(o => {
+  if (o.url.includes('PEGAR')) return;             // todavía sin URL: se omite
+  const layer = L.tileLayer(o.url, {
+    maxNativeZoom: o.maxNativeZoom, maxZoom: 8, opacity: o.opacity,
+    zIndex: 10,                                    // siempre por encima del mapa base
+    attribution: 'NASA/JPL Trek'
+  });
+  layersControl.addOverlay(layer, o.name);         // casilla para encender/apagar
+  const row = document.createElement('label');
+  const pct = document.createElement('b');
+  pct.textContent = Math.round(o.opacity * 100) + '%';
+  row.append(o.name + ': ', pct);
+  const sl = document.createElement('input');
+  sl.type = 'range'; sl.min = 0; sl.max = 100; sl.value = o.opacity * 100;
+  sl.addEventListener('input', () => {
+    layer.setOpacity(sl.value / 100);
+    pct.textContent = sl.value + '%';
+  });
+  overlayBox.append(row, sl);
+});
+
+
 // --- Radar ---
 const rangeInput = document.getElementById('range');
 const rangeLabel = document.getElementById('range-label');

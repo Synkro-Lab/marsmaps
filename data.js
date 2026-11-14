@@ -43,3 +43,23 @@ const DEM = {
 // Respaldo: [tono, metros] medidos con Show Pixel Value. Orden: tono de menor a mayor.
 const CAL_TABLE = [[7, 4538], [28, 2038], [120, -1500], [200, -5000], [270, -8200]];
 const SAT_MIN = 0.12;       // por debajo de esta saturación el píxel es blanco/gris: no hay tono
+
+// Capas que se superponen al mapa base, cada una con su deslizador de opacidad.
+// Para activar una de las térmicas: reemplaza todo el texto "PEGAR..." por la URL que saques de Trek.
+const OVERLAYS = [
+  {
+    name: "Topografía (MOLA) en color",
+    url: "https://trek.nasa.gov/tiles/Mars/EQ/Mars_MGS_MOLA_ClrShade_merge_global_463m/1.0.0/default/default028mm/{z}/{y}/{x}.jpg",
+    maxNativeZoom: 5, opacity: 0.45
+  },
+  {
+    name: "Térmica diurna (THEMIS)",
+    url: "https://trek.nasa.gov/tiles/Mars/EQ/THEMIS_DayIR_ControlledMosaics_100m_v2_oct2018/1.0.0/default/default028mm/{z}/{y}/{x}.png",
+    maxNativeZoom: 5, opacity: 0.5
+  },
+  {
+    name: "Térmica nocturna (THEMIS)",
+    url: "https://trek.nasa.gov/tiles/Mars/EQ/THEMIS_NightIR_ControlledMosaics_100m_v2_oct2018/1.0.0/default/default028mm/{z}/{y}/{x}.png",
+    maxNativeZoom: 5, opacity: 0.5
+  }
+];
