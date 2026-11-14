@@ -30,7 +30,7 @@ const baseLayers = {};
 BASE_LAYERS.forEach((b, i) => {
   const layer = L.tileLayer(b.url, { maxNativeZoom: b.maxNativeZoom, maxZoom: 8, attribution: 'NASA/JPL Trek' });
   baseLayers[b.name] = layer;
-  if (i === 0) layer.addTo(map);
+    if (b.name === "Mosaico Viking") layer.addTo(map);
 });
 
 // --- Puntos de interés ---
