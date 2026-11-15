@@ -450,11 +450,15 @@ async function updateRouteStats() {
       return elevationAt(q);                     // estimación por color
     }));
     if (token !== statsToken) return;
-    let up = 0, down = 0, maxSlope = 0;
+    let up = 0, down = 0, maxSlope = 0, ref = 0;
+    const MIN_TRAMO_M = 30;                       // tramos más cortos se agrupan: el ruido de altura no se acumula
     for (let i = 1; i < hs.length; i++) {
-      const dh = hs[i] - hs[i - 1], dm = distKm(pts[i - 1], pts[i]) * 1000;
+      const dm = distKm(pts[ref], pts[i]) * 1000;
+      if (dm < MIN_TRAMO_M && i < hs.length - 1) continue;
+      const dh = hs[i] - hs[ref];
       if (dh > 0) up += dh; else down -= dh;
-      if (dm > 0) maxSlope = Math.max(maxSlope, Math.abs(dh) / dm * 100);
+      if (dm >= MIN_TRAMO_M) maxSlope = Math.max(maxSlope, Math.abs(dh) / dm * 100);
+      ref = i;
     }
     routeElev.textContent = `${approx ? '≈ ' : ''}Sube ${Math.round(up)} m, baja ${Math.round(down)} m, pendiente máx. ~${maxSlope.toFixed(0)}%`;
   }
@@ -483,6 +487,222 @@ btnCollapse.addEventListener('click', () => {
   btnCollapse.title = collapsed ? 'Expandir panel' : 'Colapsar panel';
 });
 
+// --- Rover Perseverance: ruta (M20_waypoints.json) + fotos raw de NASA por sol ---
+// Ruta: si existe m20_waypoints.js (const M20_WAYPOINTS = {...}) se usa ese; si no, se descarga de NASA.
+const M20_JSON = "https://mars.nasa.gov/mmgis-maps/M20/Layers/json/M20_waypoints.json";
+// Fotos raw: se piden al hacer clic en un waypoint (una consulta por sol, con caché)
+const M20_RAW_API = "https://mars.nasa.gov/rss/api/?feed=raw_images&category=mars2020&feedtype=json&ver=1.2";
+const M20_RAW_PAGINAS = 5;    // máx. páginas de 100 fotos por sol que se revisan
+const M20_MAX_FOTOS = 6;      // fotos mostradas por waypoint
+const M20_EN_RADAR = false;   // true = los waypoints también salen en el radar y en "Cerca de ti"
+const M20_MS_PASO = 2500;     // milisegundos entre waypoints en el recorrido automático
+
+const m20Group = L.layerGroup();
+const m20Line = L.polyline([], { color: "#5ee7d6", weight: 2, opacity: 0.8 }).addTo(m20Group);
+let m20Pts = [], m20Idx = -1, m20Timer = null;
+const m20RawCache = {};       // sol -> Promise con todas las fotos de ese sol
+
+// Convierte el GeoJSON de NASA en una lista simple de waypoints
+function m20Parse(gj) {
+  return gj.features.map(f => {
+    const p = f.properties;
+    return { lat: p.lat, lng: normLng(p.lon), sol: p.sol, site: p.site, drive: p.drive,
+             km: p.dist_km, elev: p.elev_geoid, nota: p.Note, final: p.final };
+  }).filter(p => isFinite(p.lat) && isFinite(p.lng))
+    .sort((a, b) => a.sol - b.sol);                 // orden cronológico (estable: respeta el orden del archivo)
+}
+
+// --- Fotos raw ---
+async function m20RawDeSol(sol) {
+  if (!m20RawCache[sol]) {
+    m20RawCache[sol] = (async () => {
+      let todas = [];
+      for (let page = 0; page < M20_RAW_PAGINAS; page++) {
+        const url = `${M20_RAW_API}&num=100&page=${page}&order=sol+asc&condition_2=${sol}:sol:gte&condition_3=${sol}:sol:lte`;
+        const resp = await fetch(url);
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        const j = await resp.json();
+        const arr = j.images || j.image || [];
+        todas = todas.concat(arr);
+        if (arr.length < 100) break;
+      }
+      return todas;
+    })().catch(err => { delete m20RawCache[sol]; throw err; });   // si falla, que se pueda reintentar
+  }
+  return m20RawCache[sol];
+}
+
+const m20Prioridad = c => /MCZ|ZCAM/i.test(c) ? 0 : /NAVCAM/i.test(c) ? 1 : /SUPERCAM/i.test(c) ? 2 : /HAZCAM/i.test(c) ? 3 : 4;
+const m20Cam = i => (i.camera && i.camera.instrument) || '?';
+
+function m20Dim(i) {   // tamaño de la foto "(1648,1200)" para reservar el alto antes de que cargue
+  let ext = i.extended;
+  if (typeof ext === 'string') { try { ext = JSON.parse(ext); } catch (e) { ext = {}; } }
+  const m = /\((\d+)\s*,\s*(\d+)\)/.exec((ext && ext.dimension) || '');
+  return m ? [+m[1], +m[2]] : [4, 3];
+}
+
+// Elige las fotos de ESTE waypoint: mismo sitio y drive; si no hay, cae a las del sol
+function m20Elegir(imgs, p) {
+  const ok = imgs.filter(i => i.image_files && (i.image_files.small || i.image_files.medium));
+  const exactas = ok.filter(i => Number(i.site) === Number(p.site) && Number(i.drive) === Number(p.drive));
+  let base = exactas.length ? exactas : ok;
+  const completas = base.filter(i => i.sample_type !== 'Thumbnail');
+  if (completas.length) base = completas;
+  base = base.slice().sort((a, b) =>
+    m20Prioridad(m20Cam(a)) - m20Prioridad(m20Cam(b)) ||
+    String(a.date_taken_utc).localeCompare(String(b.date_taken_utc)));
+  const cuenta = {}, lista = [];
+  for (const i of base) {                           // máximo 2 por cámara, para variar
+    const c = m20Cam(i);
+    cuenta[c] = (cuenta[c] || 0) + 1;
+    if (cuenta[c] > 2) continue;
+    lista.push({ cam: c, hora: i.date_taken_mars || '', dim: m20Dim(i),
+                 small: i.image_files.small || i.image_files.medium,
+                 large: i.image_files.large || i.image_files.medium || i.image_files.full_res });
+    if (lista.length >= M20_MAX_FOTOS) break;
+  }
+  return { lista, exacto: exactas.length > 0, total: ok.length };
+}
+
+// fotos: null = cargando · {error} = falló · {lista, exacto, total} = listo
+function m20Popup(p, fotos) {
+  const galeria = `https://mars.nasa.gov/mars2020/multimedia/raw-images/?sol=${p.sol}`;
+  let h = `<b>Sol ${p.sol}</b> · sitio ${p.site}, drive ${p.drive}`;
+  h += `<br>${p.lat.toFixed(5)}°, ${p.lng.toFixed(5)}° · ${p.km} km recorridos`;
+  if (p.elev !== undefined) h += `<br>Altitud: ${Math.round(p.elev)} m`;
+  if (p.nota) h += `<br><small>${esc(p.nota)}</small>`;
+  if (!fotos) return h + `<br><small>Cargando fotos raw…</small>`;
+  if (fotos.error) return h + `<br><small>⚠ No se pudieron cargar las fotos (${esc(fotos.error)}). ` +
+                              `<a href="${galeria}" target="_blank" rel="noopener">Ver el sol ${p.sol} en NASA ↗</a></small>`;
+  if (!fotos.lista.length) return h + `<br><small>NASA no tiene fotos raw de este sol. ` +
+                              `<a href="${galeria}" target="_blank" rel="noopener">Ver galería ↗</a></small>`;
+  h += `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;width:280px">` +
+    fotos.lista.map(i =>
+      `<a href="${i.large}" target="_blank" rel="noopener" title="${esc(i.cam)} · ${esc(i.hora)}" style="display:block;width:calc(50% - 3px)">` +
+      `<img src="${i.small}" alt="${esc(i.cam)}" style="width:100%;aspect-ratio:${i.dim[0]}/${i.dim[1]};display:block;background:#222" ` +
+      `onerror="this.style.visibility='hidden'"><small>${esc(i.cam)}</small></a>`).join('') + `</div>`;
+  h += `<small style="display:block;margin-top:6px">` +
+       (fotos.exacto ? 'Fotos tomadas en este punto. ' : 'Sin fotos exactas de este punto: se muestran fotos de ese sol. ') +
+       `<a href="${galeria}" target="_blank" rel="noopener">Todas las del sol ${p.sol} ↗</a> · Fotos: NASA/JPL-Caltech</small>`;
+  return h;
+}
+
+async function m20CargarFotos(p, pop) {
+  let html;
+  try {
+    html = m20Popup(p, m20Elegir(await m20RawDeSol(p.sol), p));
+  } catch (err) {
+    console.warn('Fotos raw M20:', err);
+    html = m20Popup(p, { error: err.message });
+  }
+  if (map.hasLayer(pop)) pop.setContent(html);       // si ya abrió otro popup, no lo pisa
+}
+
+// Diagnóstico: en la consola escribe  probarRawM20()  (o probarRawM20(100) para otro sol)
+async function probarRawM20(sol = 14) {
+  const t0 = performance.now();
+  const imgs = await m20RawDeSol(sol);
+  console.log(`API raw OK: ${imgs.length} fotos en el sol ${sol} (${Math.round(performance.now() - t0)} ms)`);
+  const ej = imgs.find(i => i.image_files);
+  if (ej) console.log('Ejemplo:', m20Cam(ej), '· site', ej.site, '· drive', ej.drive, '·', ej.image_files.small);
+  return imgs;
+}
+
+// Va a un waypoint: abre su popup y pide sus fotos. moverAstro = el astronauta (y el radar) lo siguen.
+function m20Ir(i, moverAstro = true) {
+  if (!m20Pts.length) return;
+  i = Math.max(0, Math.min(m20Pts.length - 1, i));
+  m20Idx = i;
+  const p = m20Pts[i], ll = L.latLng(p.lat, p.lng);
+  if (moverAstro) { astro.setLatLng(ll); updateRadar(); map.panTo(ll); }
+  const pop = L.popup({ maxWidth: 320 }).setLatLng(ll).setContent(m20Popup(p, null)).openOn(map);
+  m20Info.textContent = `Sol ${p.sol} · waypoint ${i + 1}/${m20Pts.length}`;
+  m20CargarFotos(p, pop);
+}
+
+function m20Parar() {
+  clearInterval(m20Timer); m20Timer = null;
+  btnM20Play.textContent = '▶ Recorrido';
+}
+function m20Play() {
+  if (!m20Pts.length) return;
+  if (m20Timer) { m20Parar(); return; }
+  if (m20Idx >= m20Pts.length - 1) m20Idx = -1;       // si terminó, vuelve a empezar
+  btnM20Play.textContent = '⏸ Pausar';
+  const paso = () => { if (m20Idx >= m20Pts.length - 1) m20Parar(); else m20Ir(m20Idx + 1); };
+  paso();
+  m20Timer = setInterval(paso, M20_MS_PASO);
+}
+
+// Copia la ruta del rover a TU ruta (inicio + puntos): así obtienes distancia total y perfil de altitud
+function m20CargarComoRuta() {
+  if (m20Pts.length < 2) return;
+  m20Parar();
+  const aLatLng = p => { const l = L.latLng(p.lat, p.lng); l.elev = p.elev; return l; };   // altura real medida por el rover
+  startMarker.setLatLng(aLatLng(m20Pts[0]));
+  waypoints = m20Pts.slice(1).map(aLatLng);
+  updateRoute(); updateRouteStats();
+  map.fitBounds(routeLine.getBounds());
+}
+
+// Panel dentro de "Ruta"
+const m20Box = document.createElement('div');
+m20Box.innerHTML = '<h3>Rover Perseverance</h3>';
+const m20Btn = (txt, title, fn) => {
+  const b = document.createElement('button');
+  b.textContent = txt; b.title = title; b.style.margin = '0 4px 4px 0';
+  b.addEventListener('click', fn);
+  return b;
+};
+const btnM20Play = m20Btn('▶ Recorrido', 'Recorre la ruta waypoint por waypoint', m20Play);
+const m20Info = document.createElement('p');
+m20Info.textContent = 'Cargando ruta del rover…';
+m20Box.append(
+  btnM20Play,
+  m20Btn('◀', 'Waypoint anterior', () => { m20Parar(); m20Ir(m20Idx - 1); }),
+  m20Btn('▶|', 'Waypoint siguiente', () => { m20Parar(); m20Ir(m20Idx + 1); }),
+  m20Btn('Usar como mi ruta', 'Copia la ruta del rover a Trazar ruta', m20CargarComoRuta),
+  m20Info
+);
+routeElev.after(m20Box);
+
+async function cargarRover() {
+  let gj;
+  if (typeof M20_WAYPOINTS !== 'undefined') gj = M20_WAYPOINTS;       // m20_waypoints.js: funciona abriendo index.html directo
+  else {
+    const resp = await fetch(M20_JSON);                                // alternativa: requiere que NASA permita CORS
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    gj = await resp.json();
+  }
+  m20Pts = m20Parse(gj);
+  m20Line.setLatLngs(m20Pts.map(p => [p.lat, p.lng]));
+
+  m20Pts.forEach((p, i) => {
+    const fin = p.final === "y";                       // "y" = fin de recorrido, "m" = a mitad de recorrido
+    L.circleMarker([p.lat, p.lng], {
+        radius: fin ? 5 : 3, weight: 1, color: "#5ee7d6",
+        fillColor: fin ? "#5ee7d6" : "#0b0d12", fillOpacity: 0.9, bubblingMouseEvents: false })
+      .on('click', () => {
+        if (routing) {                                 // modo ruta: el waypoint entra a la ruta
+          const ll = L.latLng(p.lat, p.lng);
+          ll.elev = p.elev;
+          waypoints.push(ll);
+          updateRoute(); updateRouteStats();
+        } else m20Ir(i, false);                        // modo normal: muestra sus fotos
+      })
+      .addTo(m20Group);
+    if (M20_EN_RADAR) POIS.push({ name: `Perseverance · sol ${p.sol}`, lat: p.lat, lng: p.lng,
+                                  elev: p.elev, type: 'rover', cat: 'Rover' });
+  });
+
+  m20Group.addTo(map);
+  layersControl.addOverlay(m20Group, `Ruta Perseverance (sol ${m20Pts[0].sol}–${m20Pts[m20Pts.length - 1].sol})`);
+  map.fitBounds(m20Line.getBounds());
+  if (M20_EN_RADAR) updateRadar();
+  m20Info.textContent = `${m20Pts.length} waypoints · haz clic en uno para ver sus fotos raw`;
+}
+
 updateRadar();
 updateRoute();
 
@@ -490,4 +710,10 @@ updateRoute();
 cargarNomenclatura().catch(err => {
   console.error('No se pudo cargar la base de datos:', err);
   routeElev.textContent = '⚠ No se pudo cargar la base de datos (falta nomenclatura.js o mars_nomenclature.json)';
+});
+
+// Ruta del rover Perseverance (después de la base de datos, para que el control de capas ya tenga sus tipos)
+cargarRover().catch(err => {
+  console.error('No se pudo cargar la ruta del rover:', err);
+  m20Info.textContent = '⚠ No se pudo cargar la ruta (falta m20_waypoints.js o NASA bloqueó la descarga)';
 });

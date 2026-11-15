@@ -43,6 +43,8 @@
   <script src="nomenclatura.js"></script>
   <!-- calibracion.js se genera una vez con generarCalibracion() en la consola; si no existe, se usa la tabla de respaldo -->
   <script src="calibracion.js" onerror="console.warn('calibracion.js todavía no existe: se usa la tabla de respaldo')"></script>
+  <!-- m20_waypoints.js = copia local del JSON de NASA (ver instrucciones); si no existe, se descarga de NASA -->
+  <script src="m20_waypoints.js" onerror="console.warn('m20_waypoints.js no existe: se intentará descargar de NASA')"></script>
   <script src="app.js"></script>
 </body>
 </html>
