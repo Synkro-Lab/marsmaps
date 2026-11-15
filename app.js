@@ -29,7 +29,6 @@ const map = L.map('map', { crs: L.CRS.EPSG4326, center: START, zoom: 5, minZoom:
 const baseLayers = {};
 BASE_LAYERS.forEach((b, i) => {
   const layer = L.tileLayer(b.url, { maxNativeZoom: b.maxNativeZoom, maxZoom: 8, attribution: 'NASA/JPL Trek' });
-    o._layer = layer;   // guardamos la capa para saber luego si está encendida
   baseLayers[b.name] = layer;
     if (b.name === "Mosaico Viking") layer.addTo(map);
 });
@@ -139,14 +138,7 @@ OVERLAYS.forEach(o => {
     zIndex: 10,                                    // siempre por encima del mapa base
     attribution: 'NASA/JPL Trek'
   });
-
-if (OVERLAYS.some(o => o.termica && o._layer)) {
-  const leyenda = document.createElement('p');
-  leyenda.className = 'leyenda';
-  leyenda.innerHTML = '<b>Térmica (THEMIS):</b> imagen infrarroja en gris, no son grados. De día, más brillante = más caliente. De noche, más brillante = el suelo retiene calor (roca, terreno firme); oscuro = polvo fino y blando.';
-  overlayBox.appendChild(leyenda);
-}
-
+  o._layer = layer;                                // guardamos la capa para saber luego si está encendida
   layersControl.addOverlay(layer, o.name);         // casilla para encender/apagar
   const row = document.createElement('label');
   const pct = document.createElement('b');
@@ -160,6 +152,13 @@ if (OVERLAYS.some(o => o.termica && o._layer)) {
   });
   overlayBox.append(row, sl);
 });
+
+if (OVERLAYS.some(o => o.termica && o._layer)) {   // leyenda: una sola vez, después de crear las capas
+  const leyenda = document.createElement('p');
+  leyenda.className = 'leyenda';
+  leyenda.innerHTML = '<b>Térmica (THEMIS):</b> imagen infrarroja en gris, no son grados. De día, más brillante = más caliente. De noche, más brillante = el suelo retiene calor (roca, terreno firme); oscuro = polvo fino y blando.';
+  overlayBox.appendChild(leyenda);
+}
 
 
 // --- Radar ---
