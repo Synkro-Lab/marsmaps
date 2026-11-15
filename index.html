@@ -3,13 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Martian Map</title>
+  <title>Marsgana Navigation Tool</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <div id="map"></div>
-  <div id="elev-box">Altitud: mueve el cursor sobre el mapa</div>
+  <div id="elev-box">Elevation: move the cursor over the map</div>
 
   <!-- Radar estilo Halo -->
   <div id="radar-box">
@@ -17,23 +17,23 @@
       <div id="radar-sweep"></div>
       <div id="radar-blips"></div>
     </div>
-    <label for="range">Alcance: <b id="range-label">100</b> km</label>
+    <label for="range">Range: <b id="range-label">100</b> km</label>
     <input type="range" id="range" min="10" max="500" step="10" value="100">
   </div>
 
   <!-- Panel de ruta y cercanos (colapsable) -->
   <div id="panel">
     <div id="panel-head">
-      <strong>Ruta</strong>
-      <button id="btn-collapse" title="Colapsar panel">–</button>
+      <strong>Route</strong>
+      <button id="btn-collapse" title="Collapse panel">–</button>
     </div>
     <div id="panel-body">
-      <button id="btn-route">Trazar ruta</button>
-      <button id="btn-clear">Borrar ruta</button>
-      <button id="btn-start">Inicio = astronauta</button>
-      <p id="route-info">Ruta: sin puntos</p>
+      <button id="btn-route">Blaze a trail</button>
+      <button id="btn-clear">Erase Trail</button>
+      <button id="btn-start">Start = Trailblazer</button>
+      <p id="route-info">Route: no waypoints</p>
       <p id="route-elev"></p>
-      <h3>Cerca de ti</h3>
+      <h3>Nearby</h3>
       <ul id="nearby"></ul>
     </div>
   </div>

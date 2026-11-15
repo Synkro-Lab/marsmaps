@@ -49,13 +49,13 @@ function colorTipo(cat) {
 function popupHtml(p) {
   let h = `<b>${esc(p.name)}</b>`;
   if (p.fromDb) {
-    if (p.tipo)   h += `<br>Tipo: ${esc(p.tipo)}`;
+    if (p.tipo)   h += `<br>Type: ${esc(p.tipo)}`;
     if (p.etnia)  h += `<br>Etnia: ${esc(p.etnia)}`;
-    if (p.origen) h += `<br>Origen: ${esc(p.origen)}`;
+    if (p.origen) h += `<br>Origin: ${esc(p.origen)}`;
   } else if (p.desc) {
     h += `<br>${esc(p.desc)}`;
   }
-  if (p.elev !== undefined) h += `<br>Altitud: ${p.elev} m`;
+  if (p.elev !== undefined) h += `<br>Altitude: ${p.elev} m`;
   return h;
 }
 
