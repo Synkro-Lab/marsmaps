@@ -29,6 +29,7 @@ const map = L.map('map', { crs: L.CRS.EPSG4326, center: START, zoom: 5, minZoom:
 const baseLayers = {};
 BASE_LAYERS.forEach((b, i) => {
   const layer = L.tileLayer(b.url, { maxNativeZoom: b.maxNativeZoom, maxZoom: 8, attribution: 'NASA/JPL Trek' });
+    o._layer = layer;   // guardamos la capa para saber luego si está encendida
   baseLayers[b.name] = layer;
     if (b.name === "Mosaico Viking") layer.addTo(map);
 });
@@ -138,6 +139,14 @@ OVERLAYS.forEach(o => {
     zIndex: 10,                                    // siempre por encima del mapa base
     attribution: 'NASA/JPL Trek'
   });
+
+if (OVERLAYS.some(o => o.termica && o._layer)) {
+  const leyenda = document.createElement('p');
+  leyenda.className = 'leyenda';
+  leyenda.innerHTML = '<b>Térmica (THEMIS):</b> imagen infrarroja en gris, no son grados. De día, más brillante = más caliente. De noche, más brillante = el suelo retiene calor (roca, terreno firme); oscuro = polvo fino y blando.';
+  overlayBox.appendChild(leyenda);
+}
+
   layersControl.addOverlay(layer, o.name);         // casilla para encender/apagar
   const row = document.createElement('label');
   const pct = document.createElement('b');
@@ -339,8 +348,9 @@ map.on('mousemove', e => {
   hoverTimer = setTimeout(async () => {
     try {
       const h = await elevationAt(e.latlng);
+            const termico = await textoTermico(e.latlng);
       if (frozen) return;
-      elevBox.textContent = `Lat ${e.latlng.lat.toFixed(3)}, Lon ${e.latlng.lng.toFixed(3)} · Altitud ${Math.round(h)} m${lastSpread !== null ? ' ±' + Math.round(lastSpread) : ''} (aprox.)`;
+      elevBox.textContent = `Lat ${e.latlng.lat.toFixed(3)}, Lon ${e.latlng.lng.toFixed(3)} · Altitud ${Math.round(h)} m${lastSpread !== null ? ' ±' + Math.round(lastSpread) : ''} (aprox.)` + termico;
     } catch (err) {
             elevBox.textContent = `Lat ${e.latlng.lat.toFixed(3)}, Lon ${e.latlng.lng.toFixed(3)} · sat ${Math.round(lastSat * 100)}% · ${err.message}`;
     }
@@ -373,6 +383,60 @@ function updateRoute() {
   for (let i = 1; i < pts.length; i++) total += distKm(pts[i - 1], pts[i]);
   routeInfo.textContent = waypoints.length ? `Ruta: ${pts.length} puntos, ${total.toFixed(1)} km` : 'Ruta: arrastra el punto de inicio o haz clic para sumar puntos';
 }
+
+
+// --- Lectura térmica relativa (THEMIS en gris: el brillo es radiación infrarroja, NO grados) ---
+const tileCache = {};
+function loadTileUrl(url, z, x, y) {
+  const key = `${url}|${z}/${x}/${y}`;
+  if (!tileCache[key]) {
+    tileCache[key] = new Promise((resolve, reject) => {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => {
+        const cv = document.createElement('canvas');
+        cv.width = img.width; cv.height = img.height;
+        const ctx = cv.getContext('2d', { willReadFrequently: true });
+        ctx.drawImage(img, 0, 0);
+        resolve(ctx);
+      };
+      img.onerror = () => reject(new Error('tile térmico no disponible'));
+      img.src = L.Util.template(url, { z, x, y });
+    });
+  }
+  return tileCache[key];
+}
+
+async function grisAt(o, ll) {            // brillo promedio 0-255 en 5x5 píxeles
+  const z = o.maxNativeZoom;
+  const p = map.project(ll, z);
+  const tx = Math.floor(p.x / 256), ty = Math.floor(p.y / 256);
+  const ctx = await loadTileUrl(o.url, z, tx, ty);
+  const N = 5, half = 2;
+  const px = Math.max(0, Math.min(256 - N, Math.floor(p.x - tx * 256) - half));
+  const py = Math.max(0, Math.min(256 - N, Math.floor(p.y - ty * 256) - half));
+  const d = ctx.getImageData(px, py, N, N).data;
+  let suma = 0;
+  for (let i = 0; i < d.length; i += 4) suma += (d[i] + d[i + 1] + d[i + 2]) / 3;
+  return suma / (d.length / 4);
+}
+
+// Texto para la caja de abajo: solo de las capas térmicas que estén encendidas
+async function textoTermico(ll) {
+  const partes = [];
+  for (const o of OVERLAYS) {
+    if (!o.termica || !o._layer || !map.hasLayer(o._layer)) continue;
+    const etiqueta = o.termica === 'dia' ? 'Calor de día' : 'Firmeza del suelo';
+    try {
+      const g = await grisAt(o, ll);
+      if (g < 2) { partes.push(`${etiqueta}: sin datos`); continue; }
+      const nivel = g < 85 ? 'bajo' : g < 170 ? 'medio' : 'alto';
+      partes.push(`${etiqueta} (rel.): ${nivel} ${Math.round(g / 2.55)}/100`);
+    } catch (err) { /* sin lectura: no se muestra */ }
+  }
+  return partes.length ? ' · ' + partes.join(' · ') : '';
+}
+
 
 // Perfil de altitud: toma muestras a lo largo de la ruta
 async function updateRouteStats() {

@@ -64,3 +64,6 @@ html, body { height: 100%; margin: 0; background: var(--space); color: var(--tex
 #overlay-box h3 { margin: 0 0 6px; font-size: 14px; }
 #overlay-box label { display: block; margin-top: 8px; }
 #overlay-box input { width: 100%; }
+
+#overlay-box .leyenda { font-size: 11px; opacity: 0.85; margin: 10px 0 0; line-height: 1.35; }
+#elev-box { max-width: 90vw; text-align: center; }

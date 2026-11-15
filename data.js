@@ -55,11 +55,11 @@ const OVERLAYS = [
   {
     name: "Térmica diurna (THEMIS)",
     url: "https://trek.nasa.gov/tiles/Mars/EQ/THEMIS_DayIR_ControlledMosaics_100m_v2_oct2018/1.0.0/default/default028mm/{z}/{y}/{x}.png",
-    maxNativeZoom: 5, opacity: 0.5
+    maxNativeZoom: 5, opacity: 0.5, termica: "dia"
   },
   {
     name: "Térmica nocturna (THEMIS)",
     url: "https://trek.nasa.gov/tiles/Mars/EQ/THEMIS_NightIR_ControlledMosaics_100m_v2_oct2018/1.0.0/default/default028mm/{z}/{y}/{x}.png",
-    maxNativeZoom: 5, opacity: 0.5
+    maxNativeZoom: 5, opacity: 0.5, termica: "noche"
   }
 ];
